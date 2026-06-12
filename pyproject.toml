@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "code-context-predictor"
+version = "0.1.0"
+description = "Prototype for code context analysis and next-block prediction in autocomplete systems."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+  { name = "Intel AI Project" }
+]
+dependencies = []
+
+[project.scripts]
+code-predictor = "code_context_predictor.cli:main"
+code-predictor-api = "code_context_predictor.api:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+code_context_predictor = ["web/*.html"]

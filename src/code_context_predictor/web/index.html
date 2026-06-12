@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IDE Autocomplete Simulation</title>
+  <style>
+    :root {
+      --bg: #f3f6fa;
+      --panel: #ffffff;
+      --line: #cdd6e3;
+      --text: #1c2433;
+      --muted: #667085;
+      --accent: #1269a8;
+      --green: #14785c;
+      --code-bg: #fbfcfe;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Segoe UI, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel);
+    }
+    h1 { margin: 0; font-size: 18px; font-weight: 650; }
+    main {
+      display: grid;
+      grid-template-columns: minmax(360px, 1fr) minmax(420px, 1fr);
+      gap: 14px;
+      padding: 14px;
+      min-height: calc(100vh - 58px);
+    }
+    section {
+      min-width: 0;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      padding: 10px;
+      border-bottom: 1px solid var(--line);
+      min-height: 48px;
+    }
+    button {
+      border: 1px solid #0e5d96;
+      background: var(--accent);
+      color: white;
+      border-radius: 4px;
+      padding: 8px 12px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    button.secondary { background: white; color: var(--accent); }
+    label { color: var(--muted); font-size: 13px; }
+    input {
+      width: 56px;
+      padding: 7px;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+    }
+    textarea {
+      width: 100%;
+      min-height: calc(100vh - 130px);
+      resize: vertical;
+      border: 0;
+      padding: 14px;
+      outline: none;
+      color: #101828;
+      font: 14px/1.5 Consolas, "Courier New", monospace;
+    }
+    .output {
+      display: grid;
+      gap: 12px;
+      padding: 12px;
+      max-height: calc(100vh - 86px);
+      overflow: auto;
+    }
+    .subpanel {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .subhead {
+      padding: 8px 10px;
+      background: #edf3f8;
+      font-size: 13px;
+      font-weight: 650;
+    }
+    .features {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0;
+      font-size: 13px;
+    }
+    .feature {
+      display: grid;
+      grid-template-columns: 150px minmax(0, 1fr);
+      gap: 8px;
+      padding: 7px 10px;
+      border-top: 1px solid #e8edf3;
+      min-width: 0;
+    }
+    .feature span:first-child { color: var(--muted); }
+    .feature span:last-child {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .rows { display: grid; gap: 8px; padding: 10px; }
+    .row {
+      border: 1px solid #e1e7ef;
+      border-radius: 5px;
+      overflow: hidden;
+    }
+    .rowhead {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 8px 9px;
+      background: #fafbfd;
+      font-size: 13px;
+    }
+    .sig { color: var(--green); font-weight: 650; }
+    pre {
+      margin: 0;
+      padding: 9px;
+      overflow: auto;
+      background: var(--code-bg);
+      font: 13px/1.45 Consolas, "Courier New", monospace;
+    }
+    .reason {
+      padding: 0 9px 9px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    @media (max-width: 900px) {
+      main { grid-template-columns: 1fr; }
+      textarea { min-height: 320px; }
+      .features { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>IDE Autocomplete Simulation</h1>
+  </header>
+  <main>
+    <section>
+      <div class="toolbar">
+        <button id="predict">Предсказать</button>
+        <button id="reset" class="secondary">Пример</button>
+        <label>top-k <input id="topk" type="number" min="1" max="10" value="5"></label>
+      </div>
+      <textarea id="source" spellcheck="false"></textarea>
+    </section>
+    <section>
+      <div class="toolbar"><span>Результаты</span></div>
+      <div class="output">
+        <div class="subpanel">
+          <div class="subhead">Context features</div>
+          <div id="context" class="features"></div>
+        </div>
+        <div class="subpanel">
+          <div class="subhead">Token suggestions</div>
+          <div id="tokens" class="rows"></div>
+        </div>
+        <div class="subpanel">
+          <div class="subhead">Block predictions</div>
+          <div id="blocks" class="rows"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+  <script>
+    const source = document.querySelector("#source");
+    const contextNode = document.querySelector("#context");
+    const tokenNode = document.querySelector("#tokens");
+    const blockNode = document.querySelector("#blocks");
+    const topk = document.querySelector("#topk");
+    const sample = `def clean_names(names):
+    result = []
+    for name in names:
+        result.append(name.strip().lower())
+    <CURSOR>
+`;
+
+    source.value = sample;
+
+    document.querySelector("#reset").addEventListener("click", () => {
+      source.value = sample;
+      contextNode.innerHTML = "";
+      tokenNode.innerHTML = "";
+      blockNode.innerHTML = "";
+    });
+
+    document.querySelector("#predict").addEventListener("click", async () => {
+      contextNode.textContent = "Loading...";
+      tokenNode.textContent = "";
+      blockNode.textContent = "";
+      try {
+        const response = await fetch("/predict", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({source: source.value, top_k: Number(topk.value || 5)})
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const payload = await response.json();
+        renderContext(payload.context || {});
+        renderTokens(payload.token_suggestions || []);
+        renderBlocks(payload.predictions || []);
+      } catch (error) {
+        renderError(error);
+      }
+    });
+
+    function renderContext(context) {
+      contextNode.innerHTML = "";
+      Object.entries(context).forEach(([key, value]) => {
+        const row = document.createElement("div");
+        row.className = "feature";
+        row.innerHTML = `<span>${escapeHtml(key)}</span><span>${escapeHtml(formatValue(value))}</span>`;
+        contextNode.appendChild(row);
+      });
+    }
+
+    function renderTokens(items) {
+      tokenNode.innerHTML = "";
+      if (!items.length) {
+        tokenNode.textContent = "No token suggestions.";
+        return;
+      }
+      items.forEach((item, index) => {
+        const row = document.createElement("div");
+        row.className = "row";
+        row.innerHTML = `
+          <div class="rowhead">
+            <span>#${index + 1} <span class="sig">${escapeHtml(item.suggestion)}</span></span>
+            <span>${Number(item.confidence).toFixed(3)} · ${escapeHtml(item.source)}</span>
+          </div>
+          <div class="reason">${escapeHtml(item.reason)}</div>
+        `;
+        tokenNode.appendChild(row);
+      });
+    }
+
+    function renderBlocks(items) {
+      blockNode.innerHTML = "";
+      if (!items.length) {
+        blockNode.textContent = "No block predictions.";
+        return;
+      }
+      items.forEach((item, index) => {
+        const row = document.createElement("div");
+        row.className = "row";
+        row.innerHTML = `
+          <div class="rowhead">
+            <span>#${index + 1} <span class="sig">${escapeHtml(item.signature)}</span></span>
+            <span>${Number(item.confidence).toFixed(3)} · ${escapeHtml(item.source)}</span>
+          </div>
+          <pre>${escapeHtml((item.code || "").trimEnd())}</pre>
+          <div class="reason">${escapeHtml(item.reason || "")}</div>
+        `;
+        blockNode.appendChild(row);
+      });
+    }
+
+    function formatValue(value) {
+      if (Array.isArray(value)) return value.join(", ");
+      return String(value);
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, (char) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#039;"
+      }[char]));
+    }
+
+    function renderError(error) {
+      contextNode.innerHTML = "";
+      const row = document.createElement("div");
+      row.className = "feature";
+      row.innerHTML = `<span>error</span><span>${escapeHtml(error.message || error)}</span>`;
+      contextNode.appendChild(row);
+      tokenNode.textContent = "Backend server is not responding.";
+      blockNode.textContent = "Run: py -m code_context_predictor.cli serve --model model.json --port 8765";
+    }
+  </script>
+</body>
+</html>

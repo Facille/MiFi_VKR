@@ -1,0 +1,2 @@
+# Runtime dependencies are intentionally empty.
+# The project runs on Python 3.10+ standard library only.
