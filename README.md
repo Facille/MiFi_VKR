@@ -178,11 +178,3 @@ Block baseline:
 - embeddings являются легким TF-IDF-векторным представлением, а не нейросетевой моделью;
 - качество зависит от размера и близости обучающего корпуса.
 
-## Что показывать на защите
-
-1. `py -m unittest discover -s tests`
-2. `py -m code_context_predictor.cli complete-token ...`
-3. `py -m code_context_predictor.cli predict ...`
-4. `py -m code_context_predictor.cli evaluate ...`
-5. Web demo на `http://127.0.0.1:8765`
-6. Файлы `evaluation_report.json` и `evaluation_report.md`
